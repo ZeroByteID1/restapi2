@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="API Documentation">
+<meta name="theme-color" content="#000000">
+<title>InuSoft API — ZeroCode</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        mono: ['JetBrains Mono', 'monospace'],
+        sans: ['Inter', 'system-ui']
+      }
+    }
+  }
+}
+</script>
+
+<style>
+/* ===== ZERO CODE CORE ===== */
+* { box-sizing: border-box }
+::-webkit-scrollbar { display:none }
+
+body {
+  background:
+    linear-gradient(to right, #00000010 1px, transparent 1px),
+    linear-gradient(to bottom, #00000010 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-color:#f9fafb;
+}
+
+/* brutal cards */
+.endpoint-card,
+.category-group > div > div {
+  border:2px solid #000 !important;
+  box-shadow:6px 6px 0 #000;
+  transition:.2s;
+}
+
+.endpoint-card:hover {
+  transform:translate(-2px,-2px);
+  box-shadow:10px 10px 0 #000;
+}
+
+/* method badge */
+.method-badge {
+  border:2px solid #000;
+  font-size:10px;
+  font-weight:900;
+  padding:2px 8px;
+}
+
+.method-get{background:#e0f2fe;color:#000}
+.method-post{background:#dcfce7;color:#000}
+.method-put{background:#fef9c3;color:#000}
+.method-delete{background:#fee2e2;color:#000}
+
+/* inputs */
+input,select {
+  border:2px solid #000 !important;
+  background:#fff !important;
+  font-family:JetBrains Mono;
+}
+
+input:focus,select:focus {
+  outline:none;
+  box-shadow:4px 4px 0 #000;
+}
+
+/* buttons */
+button {
+  border:2px solid #000 !important;
+  background:#000;
+  color:#fff;
+  font-weight:700;
+  text-transform:uppercase;
+  font-size:11px;
+}
+
+button:hover {
+  background:#fff;
+  color:#000;
+}
+
+/* response */
+#response-content pre {
+  background:#000;
+  color:#00ff88;
+  border:2px solid #000;
+  padding:12px;
+  font-size:11px;
+}
+
+/* header */
+header {
+  border-bottom:2px solid #000 !important;
+}
+
+/* search */
+#searchInput {
+  font-family:JetBrains Mono;
+}
+</style>
+</head>
+
+<body class="font-mono text-black min-h-screen">
+
+<header class="sticky top-0 z-50 bg-white py-5">
+  <div class="max-w-4xl mx-auto px-8 font-bold text-lg">
+    ZERO CODE API EXPLORER
+  </div>
+</header>
+
+<main class="max-w-4xl mx-auto px-8 py-16">
+
+  <!-- TITLE -->
+  <h1 class="text-3xl font-bold mb-2" id="title"></h1>
+  <p class="text-sm mb-6 text-gray-600" id="description"></p>
+
+  <!-- SERVER -->
+  <div class="mb-6">
+    <label class="text-xs font-bold uppercase">API Server</label>
+    <select id="hostSelect" class="w-full px-3 py-2 mt-2">
+      <option id="valueURL"></option>
+    </select>
+  </div>
+
+  <!-- STATS -->
+  <div class="grid grid-cols-2 gap-4 mb-8">
+    <div class="border-2 border-black p-4 text-center">
+      <div id="totalEndpoints" class="text-2xl font-bold">0</div>
+      <div class="text-xs">ENDPOINTS</div>
+    </div>
+    <div class="border-2 border-black p-4 text-center">
+      <div id="totalCategories" class="text-2xl font-bold">0</div>
+      <div class="text-xs">CATEGORIES</div>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <input id="searchInput"
+    placeholder="SEARCH ENDPOINT..."
+    class="w-full px-4 py-3 mb-8">
+
+  <!-- CONTENT -->
+  <div id="content">
+    <div id="noResults" class="hidden text-center py-20 text-sm">
+      NO RESULT FOUND
+    </div>
+    <div id="apiList" class="space-y-6"></div>
+  </div>
+
+  <footer class="text-center text-xs mt-16 text-gray-500">
+    © <span id="year"></span> InuSoft — ZeroCode Edition
+  </footer>
+</main>
+    <script>
+      async function loadApiData() {
+        try {
+          const res = await fetch("/openapi.json");
+          const apiData = await res.json();
+          
+          // Group endpoints by category
+          const categories = {};
+          apiData.endpoints.forEach(endpoint => {
+            if (!categories[endpoint.category]) {
+              categories[endpoint.category] = [];
+            }
+            categories[endpoint.category].push(endpoint);
+          });
+          
+          const option = document.getElementById('valueURL');
+          option.value = apiData.baseURL;
+          option.textContent = `${apiData.baseURL} - Development Server`;
+    
+          // Set Title
+          document.getElementById('title').textContent = apiData.title;
+          // Set Description
+          document.getElementById('description').textContent = apiData.description;
+          // Set Year
+          document.getElementById("year").textContent = new Date().getFullYear();
+          // Count total endpoints and categories
+          document.getElementById('totalEndpoints').textContent = apiData.endpoints.length;
+          // WELL WELL WELL
+          document.getElementById('totalCategories').textContent = Object.keys(categories).length;
+    
+          // Generate HTML for API endpoints
+          const apiList = document.getElementById('apiList');
+          let categoryIndex = 0;
+    
+          for (const [categoryName, endpoints] of Object.entries(categories)) {
+            const categoryGroup = document.createElement('div');
+            categoryGroup.className = 'category-group mb-6';
+            categoryGroup.setAttribute('data-category', categoryName);
+    
+            const categoryHeader = `
+              <div class="mb-4">
+                <div class="bg-white border border-gray-200 shadow-sm">
+                  <button onclick="toggleCategory(${categoryIndex})" class="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors duration-150">
+                    <h2 class="font-bold flex items-center text-base">
+                      <span class="material-icons text-lg mr-3 text-gray-800">folder</span>
+                      <span class="truncate max-w-xs text-sm">${categoryName}</span>
+                      <span class="ml-2 text-xs text-gray-800 px-2 py-1">(${endpoints.length})</span>
+                    </h2>
+                    <span class="material-icons transition-transform duration-150" id="category-icon-${categoryIndex}">expand_more</span>
+                  </button>
+                  <div id="category-${categoryIndex}" class="hidden p-4 border-t border-gray-200">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            `;
+    
+            let categoryContent = '';
+            let endpointIndex = 0;
+    
+            endpoints.forEach(endpoint => {
+              // Badge warna untuk method
+              const methodBadges = endpoint.methods.map(method => {
+                let colorClass = 'method-get';
+                if (method === 'POST') colorClass = 'method-post';
+                else if (method === 'PUT') colorClass = 'method-put';
+                else if (method === 'DELETE') colorClass = 'method-delete';
+    
+                return `<span class="method-badge ${colorClass}">${method}</span>`;
+              }).join(' ');
+    
+              categoryContent += `
+                <div class="endpoint-card bg-white border border-gray-200 p-4 api-item" 
+                     data-method="${endpoint.methods[0]}" 
+                     data-path="${endpoint.route}" 
+                     data-alias="${endpoint.name}" 
+                     data-category="${endpoint.category}">
+                  <div class="flex justify-between items-start mb-2">
+                    <div class="flex flex-wrap gap-1">
+                      ${methodBadges}
+                    </div>
+                    <button onclick="toggleEndpoint(${categoryIndex}, ${endpointIndex})" 
+                            class="text-gray-500 hover:text-gray-700 transition-colors">
+                      <span class="material-icons text-lg" id="endpoint-icon-${categoryIndex}-${endpointIndex}">expand_more</span>
+                    </button>
+                  </div>
+    
+                  <h3 class="font-semibold text-sm font-mono mb-1 truncate" title="${endpoint.route}">${endpoint.route}</h3>
+                  <p class="text-xs text-gray-600 mb-3">${endpoint.description}</p>
+    
+                  <div id="endpoint-${categoryIndex}-${endpointIndex}" class="hidden mt-3 pt-3 border-t border-gray-100">
+                    <div class="text-gray-700 font-bold text-xs mb-2 flex items-center">
+                      <span class="material-icons text-sm mr-1">play_arrow</span>
+                      TRY IT OUT
+                    </div>
+                    <form id="form-${categoryIndex}-${endpointIndex}" 
+                          onsubmit="executeRequest(event, ${categoryIndex}, ${endpointIndex}, '${endpoint.methods[0]}', '${endpoint.route}', 'application/json')">
+                      <div class="mb-3 space-y-2">
+              `;
+    
+              // Input parameter
+              Object.entries(endpoint.paramsSchema).forEach(([paramName, paramSchema]) => {
+                if (paramSchema.type === "file") {
+                  categoryContent += `
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600">
+                        ${paramName} ${paramSchema.required ? '<span class="text-red-500">*</span>' : ''}
+                      </label>
+                      <input type="file" name="${paramName}" 
+                            class="w-full text-xs border border-gray-200 p-1 focus:outline-none bg-white"
+                            ${paramSchema.required ? 'required' : ''}>
+                    </div>
+                  `;
+                } else {
+                  categoryContent += `
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600">
+                        ${paramName} ${paramSchema.required ? '<span class="text-red-500">*</span>' : ''}
+                      </label>
+                      <div class="text-xs text-gray-400 mb-1">
+                        Type: ${paramSchema.type}${paramSchema.minLength ? `, Min Length: ${paramSchema.minLength}` : ''}
+                      </div>
+                      <input type="text" name="${paramName}" class="w-full px-3 py-2 border border-gray-200 text-xs focus:outline-none focus:border-gray-600 bg-white placeholder:text-slate-400" 
+                          placeholder="${paramName}" ${paramSchema.required ? 'required' : ''}>
+                    </div>
+                  `;
+                }
+              });
+    
+              if (Object.keys(endpoint.paramsSchema).length === 0) {
+                categoryContent += `
+                  <div class="text-xs text-gray-500 italic">
+                    No parameters required for this endpoint.
+                  </div>
+                `;
+              }
+    
+              categoryContent += `
+                      </div>
+                      <div class="flex">
+                        <button type="submit" class="bg-gray-800 hover:bg-gray-700 font-semibold text-white px-4 py-2 text-xs font-medium transition-colors duration-150">
+                          Execute
+                        </button>
+                        <button type="button" id="clear-${categoryIndex}-${endpointIndex}" onclick="clearResponse(${categoryIndex}, ${endpointIndex})" class="hidden bg-white border border-gray-200 hover:border-gray-600 font-semibold text-slate-900 px-4 py-2 text-xs font-medium transition-colors duration-150 ml-2">
+                          Clear
+                        </button>
+                      </div>
+                    </form>
+    
+                    <div id="response-${categoryIndex}-${endpointIndex}" class="hidden mt-3">
+                      <div class="text-gray-700 font-bold text-xs mb-2 flex items-center">
+                        <span class="material-icons text-sm mr-1">code</span>
+                        RESPONSE
+                      </div>
+                      <div class="bg-gray-900 text-white text-xs p-3">
+                        <div class="max-h-60 overflow-auto" id="response-content-${categoryIndex}-${endpointIndex}"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `;
+    
+              endpointIndex++;
+            });
+    
+            const categoryFooter = `
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+    
+            categoryGroup.innerHTML = categoryHeader + categoryContent + categoryFooter;
+            apiList.appendChild(categoryGroup);
+            categoryIndex++;
+          }
+    
+        } catch (err) {
+          console.error("Gagal load openapi.json:", err);
+        }
+      }
+    
+      loadApiData();
+    
+      // Toggle kategori
+      function toggleCategory(categoryIndex) {
+        const content = document.getElementById(`category-${categoryIndex}`);
+        const icon = document.getElementById(`category-icon-${categoryIndex}`);
+    
+        if (content.classList.contains('hidden')) {
+          content.classList.remove('hidden');
+          content.classList.add('slide-down');
+          icon.style.transform = 'rotate(180deg)';
+        } else {
+          content.classList.add('slide-up');
+          icon.style.transform = 'rotate(0deg)';
+          setTimeout(() => {
+            content.classList.add('hidden');
+            content.classList.remove('slide-up', 'slide-down');
+          }, 150);
+        }
+      }
+    
+      // Toggle endpoint
+      function toggleEndpoint(categoryIndex, endpointIndex) {
+        const content = document.getElementById(`endpoint-${categoryIndex}-${endpointIndex}`);
+        const icon = document.getElementById(`endpoint-icon-${categoryIndex}-${endpointIndex}`);
+    
+        if (content.classList.contains('hidden')) {
+          content.classList.remove('hidden');
+          content.classList.add('slide-down');
+          icon.style.transform = 'rotate(180deg)';
+        } else {
+          content.classList.add('slide-up');
+          icon.style.transform = 'rotate(0deg)';
+          setTimeout(() => {
+            content.classList.add('hidden');
+            content.classList.remove('slide-up', 'slide-down');
+          }, 150);
+        }
+      }
+    
+      function clearResponse(categoryIndex, endpointIndex) {
+        const responseElement = document.getElementById(`response-${categoryIndex}-${endpointIndex}`);
+        const responseContent = document.getElementById(`response-content-${categoryIndex}-${endpointIndex}`);
+        const clearButton = document.getElementById(`clear-${categoryIndex}-${endpointIndex}`);
+    
+        responseElement.classList.add('slide-up');
+        setTimeout(() => {
+          responseElement.classList.add('hidden');
+          responseElement.classList.remove('slide-up', 'slide-down');
+          responseContent.innerHTML = '';
+          clearButton.classList.add('hidden');
+        }, 150);
+      }
+    
+      async function executeRequest(event, categoryIndex, endpointIndex, method, path, contentType) {
+        event.preventDefault();
+    
+        const form = event.target;
+        const responseElement = document.getElementById(`response-${categoryIndex}-${endpointIndex}`);
+        const responseContent = document.getElementById(`response-content-${categoryIndex}-${endpointIndex}`);
+        const clearButton = document.getElementById(`clear-${categoryIndex}-${endpointIndex}`);
+        const hostSelect = document.getElementById('hostSelect');
+        const selectedHost = hostSelect.value;
+        let fullUrl = selectedHost + path;
+    
+        try {
+          let requestConfig = {
+            method: method,
+            headers: {}
+          };
+    
+          if (method === 'GET') {
+            const formData = new FormData(form);
+            const params = new URLSearchParams();
+            for (let [key, value] of formData.entries()) {
+              if (value) {
+                params.append(key, value);
+              }
+            }
+            if (params.toString()) {
+              fullUrl += '?' + params.toString();
+            }
+          } else {
+            const formData = new FormData(form);
+    
+            // cek apakah ada file
+            let hasFile = false;
+            form.querySelectorAll("input[type=file]").forEach(input => {
+              if (input.files.length > 0) hasFile = true;
+            });
+    
+            if (hasFile) {
+              requestConfig.body = formData; // biarkan browser set multipart/form-data
+            } else {
+              const jsonBody = {};
+              for (let [key, value] of formData.entries()) {
+                if (value) {
+                  jsonBody[key] = value;
+                }
+              }
+              if (Object.keys(jsonBody).length > 0) {
+                requestConfig.headers['Content-Type'] = 'application/json';
+                requestConfig.body = JSON.stringify(jsonBody);
+              }
+            }
+          }
+    
+          responseContent.innerHTML = '<span class="text-white">Loading...</span>';
+          responseElement.classList.remove('hidden');
+          responseElement.classList.add('slide-down');
+    
+          const response = await fetch(fullUrl, requestConfig);
+          const respContentType = response.headers.get("content-type");
+    
+          let bodyHtml = "";
+          if (respContentType && respContentType.includes("application/json")) {
+            const responseData = await response.json();
+            const jsonString = JSON.stringify(responseData, null, 2);
+            bodyHtml = `<pre class="text-white whitespace-pre-wrap">${jsonString}</pre>`;
+          } else if (respContentType && respContentType.startsWith("image/")) {
+            const blob = await response.blob();
+            const imageUrl = URL.createObjectURL(blob);
+            bodyHtml = `<img src="${imageUrl}" alt="API Image" class="max-w-full rounded border border-gray-700"/>`;
+          } else {
+            const textData = await response.text();
+            bodyHtml = `<pre class="text-white whitespace-pre-wrap">${textData}</pre>`;
+          }
+    
+          const headerHtml = `<div class="text-gray-400 text-xs mb-2">
+              <div>Method: ${method}</div>
+              <div>URL: ${fullUrl}</div>
+              <div>Status: ${response.status} ${response.statusText}</div>
+          </div>`;
+    
+          responseContent.innerHTML = headerHtml + bodyHtml;
+    
+        } catch (error) {
+          responseContent.innerHTML = `
+              <div class="text-gray-400 text-xs mb-2">
+                  <div>Method: ${method}</div>
+                  <div>URL: ${fullUrl}</div>
+                  <div>Status: Error</div>
+              </div>
+              <div class="text-white">Error: ${error.message}</div>
+          `;
+          responseElement.classList.remove('hidden');
+          responseElement.classList.add('slide-down');
+        } finally {
+          clearButton.classList.remove('hidden');
+        }
+      }
+    
+      // Search functionality
+      let searchInput, apiItems, noResults, apiListContainer;
+    
+      function applyFilters() {
+        const searchTerm = searchInput.value.toLowerCase().trim();
+        let visibleCount = 0;
+    
+        const categoryGroups = document.querySelectorAll('.category-group');
+    
+        categoryGroups.forEach(group => {
+          let hasVisibleItems = false;
+          let categoryVisibleCount = 0;
+          const groupItems = group.querySelectorAll('.api-item');
+    
+          groupItems.forEach(item => {
+            const path = item.getAttribute('data-path').toLowerCase();
+            const alias = item.getAttribute('data-alias').toLowerCase();
+            const method = item.getAttribute('data-method').toLowerCase();
+            const category = item.getAttribute('data-category').toLowerCase();
+    
+            const searchMatch = path.includes(searchTerm) ||
+                              alias.includes(searchTerm) ||
+                              method.includes(searchTerm) ||
+                              category.includes(searchTerm);
+    
+            if (searchMatch) {
+              item.style.display = 'block';
+              hasVisibleItems = true;
+              visibleCount++;
+              categoryVisibleCount++;
+            } else {
+              item.style.display = 'none';
+            }
+          });
+    
+          // Update category count
+          const categoryCount = group.querySelector('span.bg-gray-100');
+          if (categoryCount) {
+            categoryCount.textContent = `${categoryVisibleCount} endpoints`;
+          }
+    
+          if (hasVisibleItems) {
+            group.style.display = 'block';
+          } else {
+            group.style.display = 'none';
+          }
+        });
+    
+        if (visibleCount === 0) {
+          noResults.style.display = 'block';
+          apiListContainer.style.display = 'none';
+        } else {
+          noResults.style.display = 'none';
+          apiListContainer.style.display = 'block';
+        }
+      }
+    
+      window.addEventListener('load', () => {
+        searchInput = document.getElementById('searchInput');
+        apiItems = document.querySelectorAll('.api-item');
+        noResults = document.getElementById('noResults');
+        apiListContainer = document.getElementById('apiList');
+    
+        searchInput.addEventListener('input', function() {
+          applyFilters();
+        });
+      });
+    </script>
+</body>
+</html>
